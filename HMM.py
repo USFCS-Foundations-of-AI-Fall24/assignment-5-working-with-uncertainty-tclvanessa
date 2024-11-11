@@ -1,5 +1,3 @@
-
-
 import random
 import argparse
 import codecs
@@ -38,10 +36,33 @@ class HMM:
         """reads HMM structure from transition (basename.trans),
         and emission (basename.emit) files,
         as well as the probabilities."""
-        pass
+        # Load transitions
+        self.transitions = {}
+        with open(f"{basename}.trans", "r") as trans_file:
+            for line in trans_file:
+                parts = line.strip().split()
+                state = parts[0]
+                if state not in self.transitions:
+                    self.transitions[state] = {}
+                for i in range(1, len(parts), 2):
+                    next_state = parts[i]
+                    probability = parts[i + 1]
+                    self.transitions[state][next_state] = probability  # keep as string if needed
 
+        # Load emissions
+        self.emissions = {}
+        with open(f"{basename}.emit", "r") as emit_file:
+            for line in emit_file:
+                parts = line.strip().split()
+                state = parts[0]
+                if state not in self.emissions:
+                    self.emissions[state] = {}
+                for i in range(1, len(parts), 2):
+                    output = parts[i]
+                    probability = parts[i + 1]
+                    self.emissions[state][output] = probability  # keep as string if needed
 
-   ## you do this.
+## you do this.
     def generate(self, n):
         """return an n-length Sequence by randomly sampling from this HMM."""
         pass
@@ -52,17 +73,13 @@ class HMM:
     ## determine the most likely sequence of states.
 
 
-
-
-
-
     def viterbi(self, sequence):
         pass
     ## You do this. Given a sequence with a list of emissions, fill in the most likely
     ## hidden states using the Viterbi algorithm.
 
-
-
-
-
-
+if __name__ == '__main__':
+    h = HMM()
+    h.load('cat')
+    print(h.transitions)
+    print(h.emissions)

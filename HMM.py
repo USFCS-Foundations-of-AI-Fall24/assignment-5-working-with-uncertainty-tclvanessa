@@ -202,11 +202,11 @@ if __name__ == '__main__':
             observations = obs_file.read().strip().split()
             most_likely = hmm.forward(observations)
             if args.model == 'lander':
+                # Safe places to land for the rover
                 if most_likely in ['2,5', '3,4', '4,3', '4,4', '5,5']:
-                    most_likely = "Safe to land!"
+                    print("Forward: Safe to land!")
                 else:
-                    most_likely = "Not safe to land :("
-            print("Most likely state:", most_likely)
+                    print("Forward: Not safe to land :(")
 
     # Compute the most likely sequence of hidden states
     if args.viterbi:

@@ -2,7 +2,7 @@ import random
 import argparse
 import codecs
 import os
-import numpy
+import numpy as np
 
 # Sequence - represents a sequence of hidden states and corresponding
 # output variables.
@@ -62,24 +62,160 @@ class HMM:
                     probability = parts[i + 1]
                     self.emissions[state][output] = probability  # keep as string if needed
 
-## you do this.
+    # Generate a random sequence
     def generate(self, n):
         """return an n-length Sequence by randomly sampling from this HMM."""
-        pass
+        state = '#'
+        states = []
+        emissions = []
+        for i in range(n):
+            next_state = np.random.choice(list(self.transitions[state].keys()), p=[float(x) for x in self.transitions[state].values()])
+            states.append(next_state)
+            emission = np.random.choice(list(self.emissions[next_state].keys()), p=[float(x) for x in self.emissions[next_state].values()])
+            emissions.append(emission)
+            state = next_state
+        return Sequence(states, emissions)
 
+    ## The forward algorithm:
     def forward(self, sequence):
-        pass
-    ## you do this: Implement the Viterbi algorithm. Given a Sequence with a list of emissions,
-    ## determine the most likely sequence of states.
+        """return the most likely state sequence for the given sequence of observations."""
+        # Number of states and sequence length
+        states = list(self.transitions.keys())
+        num_states = len(states)
+        num_observations = len(sequence)
 
+        # Initialize matrix to store forward probabilities
+        M = np.zeros((num_states, num_observations))
 
+        # Set start state probability to observation 1
+        M[0, 0] = 1.0
+
+        # Calculate probabilities for each state and observation
+        for s in states:
+            if s == '#': # Skip the start state
+                continue
+            # Check if the state is in the transitions and emissions
+            if s in self.transitions[states[0]] and sequence[1] in self.emissions[s]:
+                M[states.index(s), 1] = float(self.transitions[states[0]][s]) * float(self.emissions[s][sequence[1]])
+            else:
+                M[states.index(s), 1] = 0.0 # Set to 0 if not in transitions or emissions
+
+        # Propagate forward
+        for i in range(2, num_observations):
+            for s in states:
+                if s == '#': # Skip the start state
+                    continue
+                sum_prob = 0
+                for s2 in states:
+                    t = self.transitions[s2][s] if s in self.transitions[s2] else 0.0
+                    e = self.emissions[s][sequence[i]] if sequence[i] in self.emissions[s] else 0.0
+                    sum_prob += M[states.index(s2), i - 1] * float(t) * float(e)
+                M[states.index(s), i] = sum_prob
+
+        # Return the state with the highest possible value in the last column
+        high_prob = np.argmax(M[:, num_observations - 1])
+        return states[high_prob]
+
+    ##  The Viterbi algorithm:
     def viterbi(self, sequence):
-        pass
-    ## You do this. Given a sequence with a list of emissions, fill in the most likely
-    ## hidden states using the Viterbi algorithm.
+        """return the most likely state sequence for hidden states."""
+        # Number of states and sequence length
+        states = list(self.transitions.keys())
+        num_states = len(states)
+        num_observations = len(sequence)
+
+        # Initialize matrix to store forward probabilities
+        M = np.zeros((num_states, num_observations))
+        Backpointers = np.zeros((num_states, num_observations))
+
+        # Set start state probability to observation 1
+        M[0, 0] = 1.0
+
+        # Calculate probabilities for each state and observation
+        for s in states:
+            if s == '#':
+                continue
+            if s in self.transitions[states[0]] and sequence[1] in self.emissions[s]:
+                M[states.index(s), 1] = float(self.transitions[states[0]][s]) * float(self.emissions[s][sequence[1]])
+            else:
+                M[states.index(s), 1] = 0.0
+
+        # Propagate forward
+        for i in range(2, num_observations):
+            for s in states:
+                if s == '#':
+                    continue
+                max_prob = 0 # Initialize the maximum probability
+                max_state = 0 # Initialize the state with the highest probability
+                for s2 in states:
+                    t = self.transitions[s2][s] if s in self.transitions[s2] else 0.0
+                    e = self.emissions[s][sequence[i]] if sequence[i] in self.emissions[s] else 0.0
+                    prob = M[states.index(s2), i - 1] * float(t) * float(e)
+                    if prob > max_prob:
+                        max_prob = prob
+                        max_state = states.index(s2) # Save the index of the state with the highest probability
+                M[states.index(s), i] = max_prob
+                Backpointers[states.index(s), i] = max_state
+
+        most_likely = []
+        # Find the most likely state
+        most_likely.append(np.argmax(M[:, num_observations - 1]))
+        # Find the most likely state for the rest of the observations
+        for i in range(num_observations - 1, 0, -1):
+            most_likely.append(int(Backpointers[most_likely[-1], i]))
+
+        # Reverse the list to get the most likely state in the right order
+        most_likely.reverse()
+        for i in range(len(most_likely)):
+            # Convert the index to the actual state
+            most_likely[i] = states[most_likely[i]]
+
+        return most_likely
 
 if __name__ == '__main__':
-    h = HMM()
-    h.load('cat')
-    print(h.transitions)
-    print(h.emissions)
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="HMM")
+    parser.add_argument("model", help="Basename of the transition/emission files (e.g., 'cat' for 'cat.trans' and 'cat.emit')")
+    parser.add_argument("--generate", type=int, help="Generate a random sequence of given length")
+    parser.add_argument("--forward", type=str, help="Compute the forward probability of a given sequence")
+    parser.add_argument("--viterbi", type=str, help="Compute the most likely sequence of hidden states for a given sequence of observations")
+
+    args = parser.parse_args()
+    hmm = HMM()
+    hmm.load(args.model)
+
+    # Generate a random sequence
+    if args.generate:
+        sequence = hmm.generate(args.generate)
+        print("Generated sequence:\n",sequence)
+
+        # e.g. cat_sequence.obs, lander_sequence.obs, etc.
+        file_name = f"{args.model}_sequence.obs"
+
+        # Write the sequence to a file
+        with open(file_name, 'w') as obs_file:
+            obs_file.write('\n'.join(sequence.outputseq))
+
+    # Compute the forward probability
+    if args.forward:
+        with open(args.forward, 'r') as obs_file:
+            observations = obs_file.read().strip().split()
+            most_likely = hmm.forward(observations)
+            if args.model == 'lander':
+                if most_likely in ['2,5', '3,4', '4,3', '4,4', '5,5']:
+                    most_likely = "Safe to land!"
+                else:
+                    most_likely = "Not safe to land :("
+            print("Most likely state:", most_likely)
+
+    # Compute the most likely sequence of hidden states
+    if args.viterbi:
+        with open(args.viterbi, 'r') as obs_file:
+            observations = obs_file.read().strip().split()
+            most_likely = hmm.viterbi(observations)
+            print("Most likely hidden states:", most_likely)
+
+    # else:
+    #     print("HMM loaded with transitions and emissions:")
+    #     print("Transitions:", hmm.transitions)
+    #     print("Emissions:", hmm.emissions)

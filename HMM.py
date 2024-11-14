@@ -119,6 +119,7 @@ class HMM:
     ##  The Viterbi algorithm:
     def viterbi(self, sequence):
         """return the most likely state sequence for hidden states."""
+        sequence.insert(0, '-') # Add a dummy state to the beginning of the sequence (fix for off-by-one error)
         # Number of states and sequence length
         states = list(self.transitions.keys())
         num_states = len(states)
@@ -148,9 +149,12 @@ class HMM:
                 max_prob = 0 # Initialize the maximum probability
                 max_state = 0 # Initialize the state with the highest probability
                 for s2 in states:
+                    if s2 == '#':
+                        continue
                     t = self.transitions[s2][s] if s in self.transitions[s2] else 0.0
                     e = self.emissions[s][sequence[i]] if sequence[i] in self.emissions[s] else 0.0
                     prob = M[states.index(s2), i - 1] * float(t) * float(e)
+                    # Check if the probability is higher than the current maximum
                     if prob > max_prob:
                         max_prob = prob
                         max_state = states.index(s2) # Save the index of the state with the highest probability
@@ -161,7 +165,7 @@ class HMM:
         # Find the most likely state
         most_likely.append(np.argmax(M[:, num_observations - 1]))
         # Find the most likely state for the rest of the observations
-        for i in range(num_observations - 1, 0, -1):
+        for i in range(num_observations - 1, 1, -1):
             most_likely.append(int(Backpointers[most_likely[-1], i]))
 
         # Reverse the list to get the most likely state in the right order
@@ -174,6 +178,7 @@ class HMM:
 
 if __name__ == '__main__':
     # Parse command line arguments
+    # Let's user do sequence and more from the command line
     parser = argparse.ArgumentParser(description="HMM")
     parser.add_argument("model", help="Basename of the transition/emission files (e.g., 'cat' for 'cat.trans' and 'cat.emit')")
     parser.add_argument("--generate", type=int, help="Generate a random sequence of given length")
